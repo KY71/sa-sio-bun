@@ -1,5 +1,7 @@
 # さ小文轉換器 / Sa-Sio-Bun Converter
 
+🔗 **線上版：https://sa-sio-bun.vercel.app/**
+
 ## 這是什麼？
 
 一個把中文／英文翻譯成「さ小文」的網路迷因工具。

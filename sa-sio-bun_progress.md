@@ -101,19 +101,28 @@ Google Gemini API（免費）
 - 已實作：429／5xx 自動退避重試
 - （未做）打字機效果、三段漸變、發光震動等特效，視需要再加
 
-### 🔲 第五步：部署上線
-- 上傳 GitHub
-- 連結 Vercel
-- 取得公開 URL 分享
+### ✅ 第五步：部署上線
+- GitHub repo：https://github.com/KY71/sa-sio-bun
+- Vercel 自動部署
+- **公開網址：https://sa-sio-bun.vercel.app/**
+- 更新方式：改檔 → 推上 GitHub → Vercel 自動重新部署
 
 ---
 
-## ⚠️ 安全性 TODO（重要）
+## ⚠️ 安全性 TODO
 
-- [x] **Key 不再寫死於檔案** — 改為使用者在網頁輸入，只存當前分頁，不上傳、不進版控
-- [ ] **若之後改用共用 Key／後端代理，部署後立刻去 Google AI Studio 限制來源網域**
-  - 設定 HTTP referrers 限制為 `https://你的app.vercel.app/*`
-- [ ] **確認原本貼在對話裡的舊 Key 已作廢**（若仍打算沿用，務必先設好來源限制）
+- [x] **Key 不再寫死於檔案**
+- [x] **改用後端代理** — 新增 `api/convert.js`（Vercel Serverless Function），Key 改放 Vercel 環境變數 `GEMINI_API_KEY`，前端只呼叫 `/api/convert`，使用者免貼 Key、Key 不外露
+- [ ] **在 Vercel 設好環境變數 `GEMINI_API_KEY` 並重新部署**（程式已改好，等部署）
+- [ ] **（選配）後端加簡單流量限制**，避免額度被陌生人刷爆（每天 1500 次）
+
+## 🎨 風格 TODO（重要，迷因工具的靈魂）
+
+目前是「和風極簡」靜態版，堪用但缺記憶點與分享爽感。待處理：
+
+- [ ] **決定風格方向**：A 和風極簡（現用）/ B 賽博台灣 / C 古典和紙
+- [ ] **轉換特效**：さ小文逐字浮現（打字機）、三段轉換漸變動畫、輸出瞬間發光/震動
+- [ ] **分享優化**：一鍵生成圖片或 OG 預覽，方便貼社群
 
 ---
 

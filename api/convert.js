@@ -1,0 +1,158 @@
+// Vercel Serverless Function：さ小文轉換後端代理
+// 使用者的瀏覽器呼叫 /api/convert，由這裡帶著伺服器端的 Key 去打 Gemini。
+// Gemini API Key 存在 Vercel 環境變數 GEMINI_API_KEY，永遠不會出現在前端原始碼。
+
+const MODEL = "gemini-2.5-flash-lite";
+
+const SYSTEM_PROMPT = `你是一個台語翻譯與さ小文轉換專家。
+
+さ小文是一種台灣網路迷因文體，外觀看起來像日文，但實際上是用平假名拼出台語發音，並混入少量漢字。目標是讓人一眼以為是日文，唸出來卻是純台語。
+
+## 轉換流程（每一步都要做完才能進下一步，不可跳步）
+
+### 第一步：中文／英文 → 台語
+- 翻譯成自然口語台語，逐字確認沒有漏字
+- 特別注意時間詞：「今天」是「今仔日」(kin-á-ji̍t)，三個音節都要在，不可簡寫成「今仔」
+
+### 第二步：台語 → 台羅拼音
+- 依教育部台羅方案標音
+- 把每個字的音節用「-」清楚分開，例如：今仔日 = kin-á-ji̍t
+
+### 第三步：台羅 → 假名（最關鍵，lite 最容易在這裡出錯）
+**逐音節對應，一個台羅音節 = 一個假名，不可合併、不可遺漏、不可張冠李戴。**
+
+操作方法：先把整句台羅拆成一串獨立音節，再一個一個查表轉假名。
+
+常見台羅音節 → 平假名對照（務必嚴格區分相近音）：
+- lí → り
+- kin → きん（注意！是 ki 的音，不是 ku）
+- khùn → くん（這才是 ku 的音，睏）
+- á → あ
+- ji̍t → じ
+- pá → ぱ
+- bōe / bē → べ
+- guá → わ
+- thiann → てぃあん
+- teh → てー
+- khàu → 靠（借音漢字）
+
+⚠️ 最容易錯的陷阱：kin（今，きん）和 khùn（睏，くん）發音相近但不同，絕對不可混淆。轉換時請對照原台羅，確認每個音節都對到正確假名。
+
+## さ小文四大規則
+規則一【漢字上限】：短句最多只能出現兩個漢字（專有名詞、流行語除外）
+規則二【漢字選擇】：必須以台羅發音為準去找對應借音漢字。優先順序：(1)有台味感的借音漢字如「靠」「死」「愛」「叨」(2)中日共用常用漢字如天、雨、心、人、食、今、来(3)台語原字。不可直接留原中文字（除非發音恰好吻合台羅）。
+規則三【假名優先】：其餘音節一律用平假名，盡量避免片假名。
+規則四【專有名詞保留】：流行語、新造詞、專有名詞直接保留原字不轉假名，不計入漢字上限。如「班味」「暈碳」「瑪卡巴卡」。
+規則五【嚴禁羅馬字】：sasiobun 欄位裡絕對不可出現任何羅馬拼音字母（a-z、聲調符號）。台羅拼音只是中間步驟，最終 sasiobun 只能由「平假名 + 少量漢字」組成。例如台羅的 pá 必須寫成平假名 ぱ，不可直接留 pá。
+
+## 完整示範（照這個流程做）
+輸入：你今天睡飽了沒有？
+第一步台語：你今仔日睏飽未？
+第二步台羅：lí kin-á-ji̍t khùn-pá bē？
+第三步逐音節拆解：lí=り / kin=きん / á=あ / ji̍t=じ / khùn=くん / pá=ぱ / bē=べ
+合併 sasiobun：り きん あ じ くん ぱ べ？
+
+## 自我檢查（輸出前必做，逐項確認）
+1. sasiobun 裡有沒有殘留英文字母（a-z）？有 → 全部改成平假名
+2. 台羅有幾個音節，sasiobun 就該有相對應的假名/漢字數，數量有沒有對上？少了就是漏字
+3. kin/khùn 這類相近音有沒有對到正確假名？
+
+## 參考案例
+- 來都來了 → 来と来あ
+- 我今天暈碳了 → わ 今あじ 暈碳き あ
+- 你在哪裡？ → り てぃ 叨 い？
+- 我聽你在哭 → わ てぃあん り てー 靠
+- 你睡了嗎？ → り くん 去 べ？
+
+## 輸出格式
+只輸出一個 JSON 物件，格式：
+{"taigi":"台語句子","tailo":"台羅拼音","sasiobun":"さ小文"}
+
+重要：直接回傳純 JSON 字串，開頭第一個字必須是 {，結尾最後一個字必須是 }。不要加任何說明文字，絕對不要使用 markdown 的 \`\`\` 標籤。`;
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "只接受 POST" });
+    return;
+  }
+
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    res.status(500).json({ error: "伺服器尚未設定 GEMINI_API_KEY 環境變數" });
+    return;
+  }
+
+  const { text, thinkBudget } = req.body || {};
+  if (!text || !String(text).trim()) {
+    res.status(400).json({ error: "請輸入文字" });
+    return;
+  }
+
+  // 思考預算：0=關閉、數字越大想越久、-1 為動態自動。預設 4096（較準）。
+  const budget = Number.isInteger(thinkBudget) ? thinkBudget : 4096;
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    contents: [{ role: "user", parts: [{ text: String(text) }] }],
+    generationConfig: {
+      temperature: 0.7,
+      responseMimeType: "application/json",
+      thinkingConfig: { thinkingBudget: budget }
+    }
+  });
+
+  // 遇 429（額度）或 500/502/503（伺服器忙線）自動退避重試
+  const delays = [1000, 2000, 4000, 8000];
+
+  for (let attempt = 0; ; attempt++) {
+    let upstream;
+    try {
+      upstream = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+      });
+    } catch (e) {
+      res.status(502).json({ error: "連線 Gemini 失敗，請稍後再試" });
+      return;
+    }
+
+    if ([429, 500, 502, 503].includes(upstream.status) && attempt < delays.length) {
+      await new Promise(r => setTimeout(r, delays[attempt]));
+      continue;
+    }
+
+    if (upstream.status === 429) {
+      res.status(429).json({ error: "已達免費額度上限，請稍後再試一下" });
+      return;
+    }
+    if (!upstream.ok) {
+      res.status(502).json({ error: "Gemini 回應錯誤（" + upstream.status + "）" });
+      return;
+    }
+
+    const data = await upstream.json();
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    // 強壯解析：去掉 markdown 標記，抓出第一個完整 {...}
+    let cleaned = raw.replace(/```json|```/g, "").trim();
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start === -1 || end === -1 || end < start) {
+      res.status(502).json({ error: "Gemini 回應裡找不到 JSON，請再試一次" });
+      return;
+    }
+    try {
+      const parsed = JSON.parse(cleaned.slice(start, end + 1));
+      res.status(200).json({
+        taigi: parsed.taigi || "",
+        tailo: parsed.tailo || "",
+        sasiobun: parsed.sasiobun || ""
+      });
+    } catch (err) {
+      res.status(502).json({ error: "JSON 解析失敗，請再試一次" });
+    }
+    return;
+  }
+}
