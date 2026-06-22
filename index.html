@@ -41,6 +41,7 @@
   }
 
   .app { width: 100%; max-width: 640px; text-align: center; }
+  .app[data-state="result"] { max-width: 100%; } /* 結果頁放寬，讓大字能用到整個畫面寬 */
 
   .view { display: none; animation: fade 0.35s ease; }
   .app[data-state="input"]   .view-input   { display: block; }
@@ -167,18 +168,30 @@ const THINK_BUDGET = 1024; // 固定「中」
 
 function setState(s) { app.dataset.state = s; }
 
-// 在可用寬度內把大字盡量放大，能一行就一行；真的太長才縮到下限後換行
+// 讓大字往上長，撐到貼著「畫面寬 75%」或「畫面高 75%」其中先到的邊界
 function fitText() {
-  const MAX = 150, MIN = 34;
-  const avail = out.parentElement.clientWidth;
+  const maxW = window.innerWidth * 0.75;
+  const maxH = window.innerHeight * 0.75;
   out.style.whiteSpace = "nowrap";
-  let size = MAX;
+
+  // 由小往大長，直到超出任一邊界
+  let size = 24;
   out.style.fontSize = size + "px";
-  while (size > MIN && out.scrollWidth > avail) {
-    size -= 2;
+  while (size < 1000 && out.scrollWidth <= maxW && out.scrollHeight <= maxH) {
+    size += 4;
     out.style.fontSize = size + "px";
   }
-  if (out.scrollWidth > avail) out.style.whiteSpace = "normal"; // 縮到下限仍超寬 → 允許換行
+  size -= 4;
+  out.style.fontSize = Math.max(size, 24) + "px";
+
+  // 單行就超過寬度上限（句子很長）→ 允許換行，再依高度收斂
+  if (out.scrollWidth > maxW) {
+    out.style.whiteSpace = "normal";
+    while (size > 24 && (out.scrollWidth > maxW || out.scrollHeight > maxH)) {
+      size -= 3;
+      out.style.fontSize = size + "px";
+    }
+  }
 }
 
 async function convert() {
