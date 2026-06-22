@@ -83,6 +83,67 @@ const SYSTEM_PROMPT = `你是一個台語翻譯與さ小文轉換專家。
 
 重要：直接回傳純 JSON 字串，開頭第一個字必須是 {，結尾最後一個字必須是 }。不要加任何說明文字，絕對不要使用 markdown 的 \`\`\` 標籤。`;
 
+// ====== 詞彙對照表（人工校閱版）======
+// zh=國語觸發詞、tw=台語、tailo=台羅、sasi=さ小文建議寫法。
+// 輸入句子若含 zh，會把該筆當「指定用詞」動態提示給模型，導正第一步選詞。
+// 要新增詞：在這裡加一行即可。
+const GLOSSARY = [
+  // 形容 / 情緒
+  { zh: "可愛", tw: "古錐", tailo: "kóo-tsui", sasi: "古つい" },
+  { zh: "漂亮", tw: "媠", tailo: "suí", sasi: "水" },
+  { zh: "帥", tw: "緣投", tailo: "iân-tâu", sasi: "緣たう" },
+  { zh: "厲害", tw: "𠢕", tailo: "gâu", sasi: "がう" },
+  { zh: "能幹", tw: "𠢕", tailo: "gâu", sasi: "がう" },
+  { zh: "笨", tw: "戇", tailo: "gōng", sasi: "ごん" },
+  { zh: "傻", tw: "戇", tailo: "gōng", sasi: "ごん" },
+  { zh: "醜", tw: "䆀", tailo: "bái", sasi: "ばい" },
+  { zh: "累", tw: "忝", tailo: "thiám", sasi: "てぃぁむ" },
+  { zh: "高興", tw: "歡喜", tailo: "huann-hí", sasi: "花んひ" },
+  { zh: "生氣", tw: "受氣", tailo: "siū-khì", sasi: "しう き" },
+  { zh: "不好意思", tw: "歹勢", tailo: "pháinn-sè", sasi: "拍せ" },
+  // 動作 / 日常
+  { zh: "吃", tw: "食", tailo: "tsia̍h", sasi: "甲" },
+  { zh: "睡", tw: "睏", tailo: "khùn", sasi: "くん" },
+  { zh: "玩", tw: "𨑨迌", tailo: "tshit-thô", sasi: "ちっとお" },
+  { zh: "找", tw: "揣", tailo: "tshuē", sasi: "ちゅえ" },
+  { zh: "給", tw: "予", tailo: "hōo", sasi: "ほお" },
+  { zh: "說", tw: "講", tailo: "kóng", sasi: "供" },
+  { zh: "知道", tw: "知影", tailo: "tsai-iánn", sasi: "つぁいいあん" },
+  { zh: "回去", tw: "轉去", tailo: "tńg-khì", sasi: "凳き" },
+  { zh: "工作", tw: "做穡", tailo: "tsò-sit", sasi: "つぉしっ" },
+  // 語氣 / 連接詞
+  { zh: "超", tw: "足", tailo: "tsiok", sasi: "じょ" },
+  { zh: "很", tw: "真", tailo: "tsin", sasi: "金" },
+  { zh: "非常", tw: "真", tailo: "tsin", sasi: "金" },
+  { zh: "怎麼", tw: "按怎", tailo: "án-tsuánn", sasi: "安つぁん" },
+  { zh: "什麼", tw: "啥物", tailo: "siánn-mih", sasi: "蝦みっ" },
+  { zh: "這樣", tw: "按呢", tailo: "án-ne", sasi: "安ねー" },
+  { zh: "現在", tw: "這馬", tailo: "tsit-má", sasi: "じ罵" },
+  { zh: "不要", tw: "莫", tailo: "mài", sasi: "まい" },
+  { zh: "等一下", tw: "等咧", tailo: "tán--leh", sasi: "たんれー" },
+  // 稱呼 / 人
+  { zh: "他", tw: "伊", tailo: "i", sasi: "い" },
+  { zh: "我們", tw: "阮", tailo: "gún", sasi: "ぐん" },
+  { zh: "小孩", tw: "囡仔", tailo: "gín-á", sasi: "音な" },
+  { zh: "男生", tw: "查埔", tailo: "tsa-poo", sasi: "雜ぽお" },
+  { zh: "女生", tw: "查某", tailo: "tsa-bóo", sasi: "雜もー" },
+  { zh: "老婆", tw: "牽手", tailo: "khan-tshiú", sasi: "かんちう" },
+  // 嗆 / 罵人 / 梗
+  { zh: "幹嘛", tw: "衝啥", tailo: "tshòng-siánn", sasi: "ちょんしあん" },
+  { zh: "發瘋", tw: "起痟", tailo: "khí-siáu", sasi: "き笑" },
+  { zh: "討人厭", tw: "顧人怨", tailo: "kòo-lâng-uàn", sasi: "こおらんうあん" },
+  { zh: "很煩", tw: "阿雜", tailo: "a-tsap", sasi: "あ雜" }
+];
+
+// 掃描輸入，命中的詞組成「指定用詞」提示（只注入有出現的，prompt 保持輕巧）
+function buildGlossaryHint(text) {
+  const hit = GLOSSARY.filter(e => text.includes(e.zh));
+  if (hit.length === 0) return "";
+  const lines = hit.map(e => `- 「${e.zh}」→ 台語用「${e.tw}」(${e.tailo})，さ小文寫法參考「${e.sasi}」`);
+  return "【本句指定用詞，第一步翻譯務必照用，不可改用其他講法或直譯】\n" + lines.join("\n") +
+    "\n（さ小文寫法為單詞參考；放進整句時若超過兩漢字上限，可把其中漢字改回平假名，但發音不變。）\n\n";
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "只接受 POST" });
@@ -104,10 +165,13 @@ export default async function handler(req, res) {
   // 思考預算：0=關閉、數字越大想越久、-1 為動態自動。預設 4096（較準）。
   const budget = Number.isInteger(thinkBudget) ? thinkBudget : 4096;
 
+  // 命中詞典的詞，動態組成指定用詞提示，接在使用者輸入前面
+  const userText = buildGlossaryHint(String(text)) + "輸入：" + String(text);
+
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-    contents: [{ role: "user", parts: [{ text: String(text) }] }],
+    contents: [{ role: "user", parts: [{ text: userText }] }],
     generationConfig: {
       temperature: 0.7,
       responseMimeType: "application/json",
