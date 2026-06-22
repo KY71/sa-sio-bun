@@ -240,10 +240,25 @@ function reset() {
 document.getElementById("go").addEventListener("click", convert);
 input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); convert(); } });
 document.getElementById("again").addEventListener("click", reset);
+// 挑語音：優先 Google 日本語，其次常見較自然的日文語音，最後退而求其次
+let jaVoice = null;
+function pickVoice() {
+  if (!window.speechSynthesis) return;
+  const ja = speechSynthesis.getVoices().filter(v => v.lang && v.lang.toLowerCase().startsWith("ja"));
+  jaVoice = ja.find(v => /google/i.test(v.name))
+        || ja.find(v => /(kyoko|otoya|o-ren|hattori|siri)/i.test(v.name))
+        || ja[0] || null;
+}
+if (window.speechSynthesis) {
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice; // 語音清單是非同步載入的，載好再挑一次
+}
+
 document.getElementById("speak").addEventListener("click", () => {
   if (!window.speechSynthesis) { note.textContent = "這個瀏覽器不支援發音"; return; }
   // 用日文語音唸假名，唸出來就是台語音（日文皮、台語魂）
   const u = new SpeechSynthesisUtterance(out.textContent);
+  if (jaVoice) u.voice = jaVoice;
   u.lang = "ja-JP";
   u.rate = 0.9;
   speechSynthesis.cancel();
