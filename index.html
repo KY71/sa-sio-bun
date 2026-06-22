@@ -3,235 +3,276 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>さ小文轉換器</title>
+<title>さ小文</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@800&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --ink: #1a1a1a;
-    --paper: #f4f1ea;
-    --accent: #c0392b;
-    --muted: #8a8378;
-    --line: #ddd6c8;
+    --ink: #141414;
+    --paper: #fafafa;
+    --muted: #9a9a9a;
+    --error: #c0392b;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
   body {
-    font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans TC", sans-serif;
+    font-family: "Zen Kaku Gothic New", "Noto Sans TC", "PingFang TC", system-ui, sans-serif;
     background: var(--paper);
     color: var(--ink);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 2rem 1rem;
+    justify-content: center;
+    padding: 2rem 1.2rem;
   }
-  .wrap { width: 100%; max-width: 560px; }
-  header { text-align: center; margin-bottom: 2rem; }
-  h1 { font-size: 2rem; letter-spacing: 0.1em; margin-bottom: 0.4rem; }
-  .sub { color: var(--muted); font-size: 0.85rem; letter-spacing: 0.05em; }
 
-  textarea {
-    width: 100%;
-    min-height: 90px;
-    padding: 1rem;
-    font-size: 1rem;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    background: #fffdf8;
-    resize: vertical;
-    font-family: inherit;
-  }
-  textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
-
-  .keybox { margin-bottom: 1.5rem; }
-  .keybox label {
-    display: block;
-    font-size: 0.75rem;
+  .wordmark {
+    position: fixed;
+    top: 1.4rem; left: 0; right: 0;
+    text-align: center;
+    font-family: "Shippori Mincho B1", serif;
+    font-size: 0.95rem;
+    letter-spacing: 0.35em;
     color: var(--muted);
-    letter-spacing: 0.05em;
-    margin-bottom: 0.4rem;
-  }
-  .keybox input {
-    width: 100%;
-    padding: 0.7rem 1rem;
-    font-size: 0.9rem;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    background: #fffdf8;
-    font-family: inherit;
-  }
-  .keybox input:focus { outline: 2px solid var(--accent); border-color: transparent; }
-  .keyhint { font-size: 0.7rem; color: var(--muted); margin-top: 0.4rem; line-height: 1.4; }
-  .keybox.saved { opacity: 0.55; }
-
-  .thinkrow { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.8rem; }
-  .thinkrow label { font-size: 0.8rem; color: var(--muted); flex-shrink: 0; }
-  .thinkrow select {
-    flex: 1;
-    padding: 0.5rem 0.7rem;
-    font-size: 0.85rem;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    background: #fffdf8;
-    font-family: inherit;
-    cursor: pointer;
+    opacity: 0.6;
+    user-select: none;
   }
 
-  button {
+  .app { width: 100%; max-width: 640px; text-align: center; }
+  .app[data-state="result"] { max-width: 100%; } /* 結果頁放寬，讓大字能用到整個畫面寬 */
+
+  .view { display: none; animation: fade 0.35s ease; }
+  .app[data-state="input"]   .view-input   { display: block; }
+  .app[data-state="loading"] .view-loading { display: block; }
+  .app[data-state="result"]  .view-result  { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* 輸入畫面：大游標 + 淺色說明 */
+  #input {
     width: 100%;
-    margin-top: 1rem;
-    padding: 0.9rem;
-    font-size: 1rem;
-    letter-spacing: 0.1em;
-    color: #fff;
-    background: var(--accent);
     border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: opacity 0.2s;
-  }
-  button:hover { opacity: 0.9; }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  .result {
-    margin-top: 2rem;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    background: #fffdf8;
-    overflow: hidden;
-    display: none;
-  }
-  .result.show { display: block; }
-  .row {
-    padding: 0.9rem 1rem;
-    border-bottom: 1px solid var(--line);
-    display: flex;
-    gap: 0.8rem;
-    align-items: baseline;
-  }
-  .row:last-child { border-bottom: none; }
-  .label {
-    flex-shrink: 0;
-    width: 3.2em;
-    font-size: 0.75rem;
-    color: var(--muted);
-    letter-spacing: 0.05em;
-  }
-  .val { font-size: 1rem; line-height: 1.5; word-break: break-word; }
-  .row.sasio .val { font-size: 1.4rem; font-weight: 600; letter-spacing: 0.05em; }
-
-  .copy-btn {
-    width: auto;
-    margin: 0;
-    padding: 0.3rem 0.8rem;
-    font-size: 0.75rem;
     background: transparent;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    border-radius: 3px;
-    margin-left: auto;
+    text-align: center;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: clamp(1.6rem, 7vw, 2.6rem);
+    line-height: 1.4;
+    color: var(--ink);
+    caret-color: var(--ink);
+    outline: none;
+  }
+  #input::placeholder {
+    color: var(--muted);
+    opacity: 0.7;
+    font-weight: 400;
+    font-size: 0.95rem;
+    letter-spacing: 0.04em;
   }
 
-  .status { margin-top: 1rem; text-align: center; color: var(--muted); font-size: 0.85rem; min-height: 1.2em; }
-  .error { color: var(--accent); }
-  footer { margin-top: 3rem; color: var(--muted); font-size: 0.75rem; text-align: center; }
+  .note { margin-top: 1rem; min-height: 1.2em; font-size: 0.8rem; color: var(--error); }
+
+  .primary-btn {
+    margin-top: 1.8rem;
+    padding: 0.7rem 2.4rem;
+    font-size: 0.95rem;
+    letter-spacing: 0.25em;
+    color: var(--paper);
+    background: var(--ink);
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .primary-btn:hover { opacity: 0.85; }
+  .primary-btn:active { transform: scale(0.97); }
+
+  /* Loading */
+  .loader { display: flex; gap: 0.55rem; justify-content: center; }
+  .loader span {
+    width: 0.7rem; height: 0.7rem; border-radius: 50%;
+    background: var(--ink);
+    animation: bounce 1.2s infinite ease-in-out;
+  }
+  .loader span:nth-child(2) { animation-delay: 0.15s; }
+  .loader span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bounce {
+    0%, 80%, 100% { transform: scale(0.4); opacity: 0.3; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+  .loading-cap { margin-top: 1.2rem; font-size: 0.8rem; letter-spacing: 0.2em; color: var(--muted); }
+
+  /* 結果：明朝體大字 + 兩個 icon */
+  #out {
+    display: inline-block; /* 縮成文字寬度，fitText 才能正確量測 */
+    max-width: 92vw;
+    font-family: "Shippori Mincho B1", "Noto Serif TC", "Songti TC", serif;
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: 0.02em;
+    word-break: break-word;
+    font-size: 96px; /* JS 會依寬度動態調整 */
+  }
+  .actions { display: flex; gap: 2.4rem; justify-content: center; margin-top: 2.6rem; }
+  .icon-btn {
+    background: transparent; border: none; cursor: pointer;
+    color: var(--muted);
+    display: flex; flex-direction: column; align-items: center; gap: 0.35rem;
+    font-size: 0.7rem; letter-spacing: 0.1em;
+    transition: color 0.2s;
+  }
+  .icon-btn:hover { color: var(--ink); }
+  .icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>さ小文</h1>
-    <p class="sub">日文皮・國語骨・台語魂</p>
-  </header>
+<div class="wordmark">さ小文</div>
 
-  <textarea id="input" placeholder="輸入中文或英文，例如：來都來了"></textarea>
+<main class="app" data-state="input">
 
-  <div class="thinkrow">
-    <label for="thinkbudget">思考程度</label>
-    <select id="thinkbudget">
-      <option value="0">關閉（最快，可能亂掰）</option>
-      <option value="1024">中（先想一下）</option>
-      <option value="4096" selected>高（想久一點，較準）</option>
-      <option value="-1">自動（讓模型自己決定）</option>
-    </select>
-  </div>
+  <section class="view view-input">
+    <input id="input" maxlength="16" autocomplete="off" autocapitalize="off"
+           spellcheck="false" placeholder="打一句中文（16 字內）" />
+    <p class="note" id="note"></p>
+    <button class="primary-btn" id="go">翻 譯</button>
+  </section>
 
-  <button id="go">轉換</button>
+  <section class="view view-loading">
+    <div class="loader"><span></span><span></span><span></span></div>
+    <p class="loading-cap">変換中…</p>
+  </section>
 
-  <div class="status" id="status"></div>
-
-  <div class="result" id="result">
-    <div class="row"><span class="label">原文</span><span class="val" id="r-原文"></span></div>
-    <div class="row"><span class="label">台語</span><span class="val" id="r-台語"></span></div>
-    <div class="row"><span class="label">台羅</span><span class="val" id="r-台羅"></span></div>
-    <div class="row sasio">
-      <span class="label">さ小文</span>
-      <span class="val" id="r-さ小文"></span>
-      <button class="copy-btn" id="copy">複製</button>
+  <section class="view view-result">
+    <div id="out"></div>
+    <div class="actions">
+      <button class="icon-btn" id="speak">
+        <svg viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>
+        發音
+      </button>
+      <button class="icon-btn" id="again">
+        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/></svg>
+        重來
+      </button>
+      <button class="icon-btn" id="copy">
+        <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        <span id="copy-label">拷貝</span>
+      </button>
     </div>
-  </div>
+  </section>
 
-  <footer>把你的台味，包裝成一眼像日文的迷因</footer>
-</div>
+</main>
 
 <script>
-// ====== 主邏輯 ======
-// 轉換邏輯與 Gemini Key 都在後端 /api/convert（見 api/convert.js），
-// 前端只負責把文字送過去、把結果畫出來。Key 不會出現在這裡。
+const app = document.querySelector(".app");
 const input = document.getElementById("input");
-const goBtn = document.getElementById("go");
-const statusEl = document.getElementById("status");
-const resultEl = document.getElementById("result");
-const copyBtn = document.getElementById("copy");
+const note = document.getElementById("note");
+const out = document.getElementById("out");
+const copyLabel = document.getElementById("copy-label");
+
+const THINK_BUDGET = 1024; // 固定「中」
+
+function setState(s) { app.dataset.state = s; }
+
+// 讓大字往上長，撐到貼著「畫面寬 75%」或「畫面高 75%」其中先到的邊界
+function fitText() {
+  const maxW = window.innerWidth * 0.75;
+  const maxH = window.innerHeight * 0.75;
+  out.style.whiteSpace = "nowrap";
+
+  // 由小往大長，直到超出任一邊界
+  let size = 24;
+  out.style.fontSize = size + "px";
+  while (size < 1000 && out.offsetWidth <= maxW && out.offsetHeight <= maxH) {
+    size += 4;
+    out.style.fontSize = size + "px";
+  }
+  size -= 4;
+  out.style.fontSize = Math.max(size, 24) + "px";
+
+  // 單行就超過寬度上限（句子很長）→ 允許換行，再依高度收斂
+  if (out.offsetWidth > maxW) {
+    out.style.whiteSpace = "normal";
+    while (size > 24 && (out.offsetWidth > maxW || out.offsetHeight > maxH)) {
+      size -= 3;
+      out.style.fontSize = size + "px";
+    }
+  }
+}
 
 async function convert() {
   const text = input.value.trim();
-  if (!text) { setStatus("請先輸入文字", true); return; }
+  note.textContent = "";
+  if (!text) { note.textContent = "先打一句話再翻譯"; input.focus(); return; }
 
-  goBtn.disabled = true;
-  resultEl.classList.remove("show");
-  setStatus("轉換中…");
-
-  // 思考預算：0=關閉，數字越大想越久（但越慢、越耗額度）。-1 為動態自動。
-  const thinkBudget = parseInt(document.getElementById("thinkbudget").value, 10);
+  setState("loading");
 
   try {
     const res = await fetch("/api/convert", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, thinkBudget })
+      body: JSON.stringify({ text, thinkBudget: THINK_BUDGET })
     });
-
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || ("錯誤 " + res.status));
 
-    document.getElementById("r-原文").textContent = text;
-    document.getElementById("r-台語").textContent = data.taigi || "—";
-    document.getElementById("r-台羅").textContent = data.tailo || "—";
-    document.getElementById("r-さ小文").textContent = data.sasiobun || "—";
-    resultEl.classList.add("show");
-    setStatus("");
+    out.textContent = data.sasiobun || "—";
+    setState("result");
+    fitText();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitText); // 字體載入後再校正
   } catch (err) {
     console.error(err);
-    setStatus("轉換失敗：" + err.message, true);
+    note.textContent = "轉換失敗：" + err.message;
+    setState("input");
+    input.focus();
   }
-  goBtn.disabled = false;
 }
 
-function setStatus(msg, isError) {
-  statusEl.textContent = msg;
-  statusEl.classList.toggle("error", !!isError);
+function reset() {
+  input.value = "";
+  out.textContent = "";
+  note.textContent = "";
+  copyLabel.textContent = "拷貝";
+  setState("input");
+  input.focus();
 }
 
-goBtn.addEventListener("click", convert);
-input.addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") convert();
+document.getElementById("go").addEventListener("click", convert);
+input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); convert(); } });
+document.getElementById("again").addEventListener("click", reset);
+// 挑語音：優先 Google 日本語，其次常見較自然的日文語音，最後退而求其次
+let jaVoice = null;
+function pickVoice() {
+  if (!window.speechSynthesis) return;
+  const ja = speechSynthesis.getVoices().filter(v => v.lang && v.lang.toLowerCase().startsWith("ja"));
+  jaVoice = ja.find(v => /google/i.test(v.name))
+        || ja.find(v => /(kyoko|otoya|o-ren|hattori|siri)/i.test(v.name))
+        || ja[0] || null;
+}
+if (window.speechSynthesis) {
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice; // 語音清單是非同步載入的，載好再挑一次
+}
+
+document.getElementById("speak").addEventListener("click", () => {
+  if (!window.speechSynthesis) { note.textContent = "這個瀏覽器不支援發音"; return; }
+  // 用日文語音唸假名，唸出來就是台語音（日文皮、台語魂）
+  const u = new SpeechSynthesisUtterance(out.textContent);
+  if (jaVoice) u.voice = jaVoice;
+  u.lang = "ja-JP";
+  u.rate = 0.9;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
 });
-copyBtn.addEventListener("click", () => {
-  const t = document.getElementById("r-さ小文").textContent;
-  navigator.clipboard.writeText(t).then(() => {
-    copyBtn.textContent = "已複製";
-    setTimeout(() => (copyBtn.textContent = "複製"), 1500);
+document.getElementById("copy").addEventListener("click", () => {
+  navigator.clipboard.writeText(out.textContent).then(() => {
+    copyLabel.textContent = "已拷貝";
+    setTimeout(() => (copyLabel.textContent = "拷貝"), 1500);
   });
 });
+
+window.addEventListener("load", () => input.focus());
+window.addEventListener("resize", () => { if (app.dataset.state === "result") fitText(); });
 </script>
 </body>
 </html>
