@@ -105,6 +105,8 @@
 
   /* 結果：明朝體大字 + 兩個 icon */
   #out {
+    display: inline-block; /* 縮成文字寬度，fitText 才能正確量測 */
+    max-width: 92vw;
     font-family: "Shippori Mincho B1", "Noto Serif TC", "Songti TC", serif;
     font-weight: 800;
     line-height: 1.25;
@@ -144,6 +146,10 @@
   <section class="view view-result">
     <div id="out"></div>
     <div class="actions">
+      <button class="icon-btn" id="speak">
+        <svg viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>
+        發音
+      </button>
       <button class="icon-btn" id="again">
         <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/></svg>
         重來
@@ -177,7 +183,7 @@ function fitText() {
   // 由小往大長，直到超出任一邊界
   let size = 24;
   out.style.fontSize = size + "px";
-  while (size < 1000 && out.scrollWidth <= maxW && out.scrollHeight <= maxH) {
+  while (size < 1000 && out.offsetWidth <= maxW && out.offsetHeight <= maxH) {
     size += 4;
     out.style.fontSize = size + "px";
   }
@@ -185,9 +191,9 @@ function fitText() {
   out.style.fontSize = Math.max(size, 24) + "px";
 
   // 單行就超過寬度上限（句子很長）→ 允許換行，再依高度收斂
-  if (out.scrollWidth > maxW) {
+  if (out.offsetWidth > maxW) {
     out.style.whiteSpace = "normal";
-    while (size > 24 && (out.scrollWidth > maxW || out.scrollHeight > maxH)) {
+    while (size > 24 && (out.offsetWidth > maxW || out.offsetHeight > maxH)) {
       size -= 3;
       out.style.fontSize = size + "px";
     }
@@ -234,6 +240,15 @@ function reset() {
 document.getElementById("go").addEventListener("click", convert);
 input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); convert(); } });
 document.getElementById("again").addEventListener("click", reset);
+document.getElementById("speak").addEventListener("click", () => {
+  if (!window.speechSynthesis) { note.textContent = "這個瀏覽器不支援發音"; return; }
+  // 用日文語音唸假名，唸出來就是台語音（日文皮、台語魂）
+  const u = new SpeechSynthesisUtterance(out.textContent);
+  u.lang = "ja-JP";
+  u.rate = 0.9;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+});
 document.getElementById("copy").addEventListener("click", () => {
   navigator.clipboard.writeText(out.textContent).then(() => {
     copyLabel.textContent = "已拷貝";
