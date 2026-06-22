@@ -2,7 +2,7 @@
 // 使用者的瀏覽器呼叫 /api/convert，由這裡帶著伺服器端的 Key 去打 Gemini。
 // Gemini API Key 存在 Vercel 環境變數 GEMINI_API_KEY，永遠不會出現在前端原始碼。
 
-const MODEL = "gemini-2.5-flash-lite";
+const MODEL = "gemini-2.5-flash";
 
 const SYSTEM_PROMPT = `你是一個台語翻譯與さ小文轉換專家。
 
@@ -77,6 +77,12 @@ const SYSTEM_PROMPT = `你是一個台語翻譯與さ小文轉換專家。
 - 我聽你在哭 → わ てぃあん り てー 靠
 - 你睡了嗎？ → り くん 去 べ？
 
+## さ小文排版規則（重要）
+sasiobun 預設「全部相連、不加空白」，像真正的日文一樣。
+只有在原句有**明顯停頓、標點、或語氣轉折**處，才用空白或標點斷開。
+（本提示與下方參考案例為了標示音節而留空白，那只是教學用；最終輸出請把同一語氣段落內的假名與漢字直接黏在一起。）
+例：い きん べ ああ 音な あい 甲 → 實際輸出寫成「いきんべ ああ 音なあい甲」之類，僅在語氣停頓處留空。
+
 ## 輸出格式
 只輸出一個 JSON 物件，格式：
 {"taigi":"台語句子","tailo":"台羅拼音","sasiobun":"さ小文"}
@@ -132,7 +138,12 @@ const GLOSSARY = [
   { zh: "幹嘛", tw: "衝啥", tailo: "tshòng-siánn", sasi: "ちょんしあん" },
   { zh: "發瘋", tw: "起痟", tailo: "khí-siáu", sasi: "き笑" },
   { zh: "討人厭", tw: "顧人怨", tailo: "kòo-lâng-uàn", sasi: "こおらんうあん" },
-  { zh: "很煩", tw: "阿雜", tailo: "a-tsap", sasi: "あ雜" }
+  { zh: "很煩", tw: "阿雜", tailo: "a-tsap", sasi: "あ雜" },
+  // 其他
+  { zh: "已經", tw: "已經", tailo: "í-king", sasi: "いきん" },
+  { zh: "購買", tw: "買", tailo: "bé", sasi: "べ" },
+  { zh: "買", tw: "買", tailo: "bé", sasi: "べ" },
+  { zh: "愛", tw: "愛", tailo: "ài", sasi: "あい" }
 ];
 
 // 掃描輸入，命中的詞組成「指定用詞」提示（只注入有出現的，prompt 保持輕巧）
