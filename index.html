@@ -16,34 +16,6 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
-
-  /* 背景白噪點：微動顆粒，輕微閃動有電視雜訊感，但克制不吵 */
-  .noise {
-    position: fixed;
-    inset: -60%;
-    z-index: 0;
-    pointer-events: none;
-    opacity: 0.08;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    animation: grain 0.5s steps(1) infinite;
-  }
-  @keyframes grain {
-    0%{transform:translate(0,0)} 10%{transform:translate(-3%,-5%)} 20%{transform:translate(-8%,3%)}
-    30%{transform:translate(4%,-8%)} 40%{transform:translate(-5%,6%)} 50%{transform:translate(7%,-3%)}
-    60%{transform:translate(-6%,-6%)} 70%{transform:translate(3%,7%)} 80%{transform:translate(-4%,4%)}
-    90%{transform:translate(6%,-5%)} 100%{transform:translate(0,0)}
-  }
-  @media (prefers-reduced-motion: reduce) { .noise { animation: none; } }
-  .wordmark, .app { position: relative; z-index: 1; }
-
-  /* 粒子轉場用的畫布：結果浮現時，大字由墨點飛聚成形 */
-  #fx {
-    position: fixed; inset: 0;
-    width: 100%; height: 100%;
-    z-index: 5;
-    pointer-events: none;
-    display: none;
-  }
   body {
     font-family: "Zen Kaku Gothic New", "Noto Sans TC", "PingFang TC", system-ui, sans-serif;
     background: var(--paper);
@@ -155,8 +127,6 @@
 </style>
 </head>
 <body>
-<div class="noise" aria-hidden="true"></div>
-<canvas id="fx" aria-hidden="true"></canvas>
 <div class="wordmark">さ小文</div>
 
 <main class="app" data-state="input">
@@ -231,67 +201,6 @@ function fitText() {
   }
 }
 
-// 粒子聚合轉場：把 #out 目前的文字，依它在畫面上的位置與字級，
-// 用墨點從中心四散處飛聚成形，動畫結束後再顯示真正的 DOM 文字。
-function playAssemble() {
-  const fx = document.getElementById("fx");
-  const ctx = fx.getContext("2d");
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const rect = out.getBoundingClientRect();
-  const fontPx = parseFloat(getComputedStyle(out).fontSize);
-  const text = out.textContent;
-
-  fx.width = window.innerWidth * dpr;
-  fx.height = window.innerHeight * dpr;
-
-  const off = document.createElement("canvas");
-  off.width = fx.width; off.height = fx.height;
-  const o = off.getContext("2d");
-  o.fillStyle = "#141414";
-  o.textAlign = "center";
-  o.textBaseline = "middle";
-  o.font = "800 " + (fontPx * dpr) + "px 'Shippori Mincho B1','Noto Serif TC',serif";
-  const cx = (rect.left + rect.width / 2) * dpr;
-  const cy = (rect.top + rect.height / 2) * dpr;
-  o.fillText(text, cx, cy);
-
-  const data = o.getImageData(0, 0, off.width, off.height).data;
-  const step = Math.max(2, Math.round(4 * dpr));
-  const parts = [];
-  for (let y = 0; y < off.height; y += step) {
-    for (let x = 0; x < off.width; x += step) {
-      if (data[(y * off.width + x) * 4 + 3] > 128) {
-        const a = Math.random() * 6.283;
-        const r = (rect.width + rect.height) * dpr * (0.3 + Math.random() * 0.7);
-        parts.push({ tx: x, ty: y, sx: cx + Math.cos(a) * r, sy: cy + Math.sin(a) * r });
-      }
-    }
-  }
-  if (parts.length === 0) return; // 取樣失敗就直接顯示文字（保底）
-
-  out.style.visibility = "hidden";
-  fx.style.display = "block";
-  const sz = Math.max(1, 1.8 * dpr);
-  const ease = p => 1 - Math.pow(1 - p, 3);
-  let start = null;
-  function tick(ts) {
-    if (!start) start = ts;
-    const p = Math.min(1, (ts - start) / 750);
-    const e = ease(p);
-    ctx.clearRect(0, 0, fx.width, fx.height);
-    ctx.fillStyle = "#141414";
-    for (let i = 0; i < parts.length; i++) {
-      const pt = parts[i];
-      ctx.globalAlpha = e;
-      ctx.fillRect(pt.sx + (pt.tx - pt.sx) * e, pt.sy + (pt.ty - pt.sy) * e, sz, sz);
-    }
-    ctx.globalAlpha = 1;
-    if (p < 1) requestAnimationFrame(tick);
-    else { fx.style.display = "none"; ctx.clearRect(0, 0, fx.width, fx.height); out.style.visibility = "visible"; }
-  }
-  requestAnimationFrame(tick);
-}
-
 async function convert() {
   const text = input.value.trim();
   note.textContent = "";
@@ -310,11 +219,9 @@ async function convert() {
 
     out.textContent = data.sasiobun || "—";
     lastYomi = data.yomi || data.sasiobun || "";
-    out.style.visibility = "visible";
     setState("result");
-    const reveal = () => { fitText(); playAssemble(); }; // 先量好字級位置，再播粒子聚合
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(reveal);
-    else reveal();
+    fitText();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitText); // 字體載入後再校正
   } catch (err) {
     console.error(err);
     note.textContent = "轉換失敗：" + err.message;
@@ -326,7 +233,6 @@ async function convert() {
 function reset() {
   input.value = "";
   out.textContent = "";
-  out.style.visibility = "visible";
   lastYomi = "";
   note.textContent = "";
   copyLabel.textContent = "拷貝";
