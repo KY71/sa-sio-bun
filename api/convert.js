@@ -83,9 +83,17 @@ sasiobun 預設「全部相連、不加空白」，像真正的日文一樣。
 （本提示與下方參考案例為了標示音節而留空白，那只是教學用；最終輸出請把同一語氣段落內的假名與漢字直接黏在一起。）
 例：い きん べ ああ 音な あい 甲 → 實際輸出寫成「いきんべ ああ 音なあい甲」之類，僅在語氣停頓處留空。
 
+## 發音字串 yomi（給語音合成唸的，最關鍵）
+sasiobun 為了視覺會用借音漢字（如 食→甲、這馬→じ罵），但這些漢字的「日文唸法」常常對不上台語音，直接唸會錯。
+所以要另外產生 yomi：把 sasiobun 裡的**漢字全部改寫成對應台語發音的平假名**，讓日文語音唸出來貼近台語。
+- yomi 只能由平假名組成，**不可有任何漢字、不可有羅馬字**。
+- 假名要對應該字的台羅發音，不是該漢字的日文音。
+- 例：sasiobun「甲」(食 tsia̍h) → yomi「ちゃ」；sasiobun「じ罵」(這馬 tsit-má) → yomi「じまー」；sasiobun「古つい」(古錐 kóo-tsui) → yomi「こおつい」。
+- 空白/斷句比照 sasiobun。
+
 ## 輸出格式
 只輸出一個 JSON 物件，格式：
-{"taigi":"台語句子","tailo":"台羅拼音","sasiobun":"さ小文"}
+{"taigi":"台語句子","tailo":"台羅拼音","sasiobun":"さ小文","yomi":"發音用純平假名"}
 
 重要：直接回傳純 JSON 字串，開頭第一個字必須是 {，結尾最後一個字必須是 }。不要加任何說明文字，絕對不要使用 markdown 的 \`\`\` 標籤。`;
 
@@ -236,7 +244,8 @@ export default async function handler(req, res) {
       res.status(200).json({
         taigi: parsed.taigi || "",
         tailo: parsed.tailo || "",
-        sasiobun: parsed.sasiobun || ""
+        sasiobun: parsed.sasiobun || "",
+        yomi: parsed.yomi || ""
       });
     } catch (err) {
       res.status(502).json({ error: "JSON 解析失敗，請再試一次" });
