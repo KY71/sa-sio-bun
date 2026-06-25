@@ -16,6 +16,17 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
+
+  /* 背景白噪點：很淡的一層顆粒，增加質感又不吵 */
+  .noise {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wordmark, .app { position: relative; z-index: 1; }
   body {
     font-family: "Zen Kaku Gothic New", "Noto Sans TC", "PingFang TC", system-ui, sans-serif;
     background: var(--paper);
@@ -127,6 +138,7 @@
 </style>
 </head>
 <body>
+<div class="noise" aria-hidden="true"></div>
 <div class="wordmark">さ小文</div>
 
 <main class="app" data-state="input">
@@ -171,6 +183,7 @@ const out = document.getElementById("out");
 const copyLabel = document.getElementById("copy-label");
 
 const THINK_BUDGET = 1024; // 固定「中」
+let lastYomi = ""; // 發音用的純假名字串（漢字已換成對應台語音的假名）
 
 function setState(s) { app.dataset.state = s; }
 
@@ -217,6 +230,7 @@ async function convert() {
     if (!res.ok) throw new Error(data.error || ("錯誤 " + res.status));
 
     out.textContent = data.sasiobun || "—";
+    lastYomi = data.yomi || data.sasiobun || "";
     setState("result");
     fitText();
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitText); // 字體載入後再校正
@@ -231,6 +245,7 @@ async function convert() {
 function reset() {
   input.value = "";
   out.textContent = "";
+  lastYomi = "";
   note.textContent = "";
   copyLabel.textContent = "拷貝";
   setState("input");
@@ -257,7 +272,7 @@ if (window.speechSynthesis) {
 document.getElementById("speak").addEventListener("click", () => {
   if (!window.speechSynthesis) { note.textContent = "這個瀏覽器不支援發音"; return; }
   // 用日文語音唸假名，唸出來就是台語音（日文皮、台語魂）
-  const u = new SpeechSynthesisUtterance(out.textContent);
+  const u = new SpeechSynthesisUtterance(lastYomi || out.textContent);
   if (jaVoice) u.voice = jaVoice;
   u.lang = "ja-JP";
   u.rate = 0.9;
